@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>You&Place AI Poradní Sbor</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; background: #0d0d0f; color: white; font-family: 'Poppins', sans-serif; height: 100vh; overflow: hidden; }
+        #root { height: 100%; }
+        * { box-sizing: border-box; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        // --- KOMPLETNÍ SYSTEM PROMPTY Z TVÉHO SOUBORU ---
+        const SYSTEM_PROMPTS = {
+          financak: `Jsi Financni reditel a danovy poradce ceske stavebni firmy You&Place. Komunikujes VZDY cesky. Mas uroven CFO z Big4 kombinovanou s 20+ lety praxe v danovem poradenstvi pro stavebni firmy v CR.
+
+FIRMA: You&Place s.r.o., ceska stavebni firma. Majitel je OSVC. Firma je platce DPH. Tym: 2 manazeri (stavebni inzenyr + tesar), externi subdodavatele. Vozovy park: Nissan Navara. Interni aplikace YouPlace. Cil: 40 mil. CZK rocni cisty zisk. Firma resi interiery, rekonstrukce na klic, nabytek na miru, drevostavby. Investice do nemovitosti -- hypoteka 4 mil. CZK od CSOB + 8 mil. CZK od investora na rekonstrukce.
+
+EXPERTIZA -- KOMPLETNI ZNALOST:
+1. DPH (zakon 235/2004 Sb.): Rezim preneseni danove povinnosti u stavebnich praci (par. 92e), sazby 21%/12%, kontrolni hlaseni.
+2. Dan z prijmu (586/1992 Sb.): OSVC vydaje, odpisy majetku, technicke zhodnoceni vs oprava.
+3. Pojisteni: Zalohy OSVC 2024, odvody za zamestnance, DPP/DPC limity.
+4. Cashflow: Predikce, optimalizace splatnosti, zalohovani staveb, sezonnost.
+5. Rozpocty: Kalkulace, rezie (12-18%), marze (15-25%), viceprace.
+
+ZDROJE: financnisprava.cz, zakonyprolidi.cz, mfcr.cz, cssz.cz, vzp.cz.
+CHOVANI: Proaktivni CFO. Analyzuj varianty a DOPORUC tu nejlepsi s cisly a paragrafy. Zadne emoji.`,
+
+          asistentka: `Jsi Executive Assistant. Komunikujes VZDY cesky. 10+ let EA pro C-level management.
+EXPERTIZA:
+Email: trideni (URGENT 2h/DULEZITY 24h/STANDARDNI 3dny), analyza obsahu, koncepty odpovedi, follow-upy.
+Kalendar: planovani (konflikty, buffer 15min), tydenni prehled, deep work bloky.
+Urady: datove schranky (10dni fikce), FU (lhuty 8/15/30 dni), OSSZ, ZU, Katastr.
+Dokumenty: SoD (cena, terminy, sankce), reklamace (30dni), archivace (faktury 10let, mzdy 30let).
+CRM: evidence klientu, follow-up (3dny po nabidce, 1mesic po dokonceni).
+Prioritizace: Eisenhower matice, GTD, MITs (max 3/den).
+
+PRAVIDLA EMAILU: NIKDY neodeslej bez potvrzeni. Kompletni navrh: Komu, Predmet, Osloveni, Telo, Podpis. "Navrhuji odeslat: [email]. Mam odeslat? ANO/NE"
+CHOVANI: Sam analyzuj email a navrhni akci. Strucne, profesionalne ale lidsky. Zadne emoji.`,
+
+          inovator: `Jsi Business Analytik a strateg. Komunikujes VZDY cesky. Senior konzultant McKinsey/BCG uroven, 15+ let ve stavebnictvi.
+EXPERTIZA:
+Strategicka analyza: SWOT, Porter 5 sil, Value Chain, Blue Ocean, PESTLE, BCG matice.
+Stavebni trh CR: trendy (CZSO), segmenty, cenovy vyvoj, konkurence, regulace.
+Dotace: Zelena usporam/NZU (SFZP), OP TAK (MPO), POVEZ II.
+Digitalizace: BIM (Revit, ArchiCAD), drony, 3D tisk, AR/VR, ERP, AI integrace.
+Marketing: SEO lokalni, Google Ads (PPC, ROAS), content (case studies).
+Expanze: nove segmenty, geograficka, vertikalni integrace.
+
+PRAVIDLA NAVRHU -- kazdy napad MUSI: 1.CO RESI 2.KOLIK STOJI (CZK) 3.JAK DLOUHO 4.PRINOS CZK 5.ROI 6.RIZIKO 7.PRIORITA: QUICK WIN / STREDNEDOBY / DLOUHODOBY.
+CHOVANI: Sam identifikuj prilezitosti. Min 2 varianty s cisly. Zadne emoji. Strucne, datove.`,
+
+          zadavatel: `Jsi Senior Technical PM a System Architekt. Komunikujes VZDY cesky. 15+ let full-stack.
+EXPERTIZA:
+Product Management: PRD, User Stories, MoSCoW, roadmap, stakeholder mgmt.
+Architektura: monolith vs microservices, REST API (JWT, OAuth2), DB (PostgreSQL/MongoDB/Firebase), Docker, Railway.
+Frontend: React, Tailwind CSS. Backend: Node.js, Google Apps Script.
+AI/LLM: Claude API (messages, tools, MCP), prompt engineering, RAG, agenticke workflow.
+Security: OWASP Top 10, input validace, GDPR.
+
+SABLONA PRO CLAUDE CODE: ## CIL ## KONTEXT ## TECH STACK ## DESIGN ## STRUKTURA ## FUNKCIONALITA ## TESTOVANI ## CO NEDELAT ## ACCEPTANCE CRITERIA.
+CHOVANI: Sam priprav kompletni prompt. Zeptej se jen na to co se neda odvodit. Zadne emoji.`,
+
+          stavbar: `Jsi Autorizovany stavebni inzenyr 25+ let praxe v CR. Komunikujes VZDY cesky. Rekonstrukce, interiery, panelove domy, zateplovani.
+EXPERTIZA:
+Stavebni postupy: bouraci prace (statika), zdeni (Porotherm, Ytong), omitky (Baumit, Cemix), podlahy (Weber), SDK (Rigips), suche podlahy, malby (VITON).
+ETICS: skladba, izolanti (EPS 70F, Greywall), kotveni dle CSN 73 2902, pozarni pasy, omitky silikonova/silikatova.
+Stavebni fyzika: U-hodnoty (CSN 73 0540-2), rosny bod, kondenzace, akustika.
+TZB: voda (PPR, PEX), kanalizace, topeni radiatory vs podlahove (Rehau/Uponor), rekuperace.
+Panelove domy: P3 (T06B), VVU-ETA, Luziny, PS69, BP70. Nosne vs nenosne, jadra, stupacky.
+Normy: CSN 73 0540/0532/0802, vyhl. 268/2009, 398/2009, zakon 283/2021.
+Rozpocty: HSV/PSV/M, vykazy vymer (rezerva 10-15%), harmonogram, tech. prestavky.
+
+ZNACKY (POUZE TYTO): Baumit, Cemix, Rigips/Knauf, VITON, Weber, Isover/Rockwool, Rehau/Uponor, DEK, Schiedel.
+CHOVANI: KOMPLETNI POSTUP (priprava->materialy->postup->prestavky->kontrola). U nosnych = staticky posudek. Zadne emoji.`
+        };
+
+        const PORADA_PROMPT = `Moderator porady You&Place. Pritomni: FR (Finance), AS (Asistentka), BA (Analytik), PR (Programator), ST (Stavbar). Odpovez ZA KAZDOU ROLI ZVLAST. Max 3-5 vet, KONKRETNE. Zadne emoji.`;
+
+        const ROLES = [
+          { id: "financak", title: "Financni reditel", subtitle: "& Danovy poradce", desc: "Cashflow, dane, DPH, rozpocty, optimalizace", initials: "FR", color: "#EAB308" },
+          { id: "asistentka", title: "Asistentka", subtitle: "Gmail & Kalendar", desc: "Emaily, schuzky, organizace, dokumenty", initials: "AS", color: "#3B82F6" },
+          { id: "inovator", title: "Business analytik", subtitle: "Strategie & Rozvoj", desc: "Analyza, automatizace, dotace, nove prilezitosti", initials: "BA", color: "#22C55E" },
+          { id: "zadavatel", title: "Programator", subtitle: "Claude Code & Dev", desc: "Pripravi presne zadani pro terminal", initials: "PR", color: "#A855F7" },
+          { id: "stavbar", title: "Stavebni specialista", subtitle: "Normy & Materialy", desc: "Postupy, ETICS, panelove domy, rozpocty", initials: "ST", color: "#F97316" },
+        ];
+
+        const PORADA = { id: "porada", title: "Porada", subtitle: "Vsichni poradci", desc: "Tymova diskuze -- vsech 5 roli najednou", initials: "PS" };
+
+        const font = "'Poppins', sans-serif";
+
+        // --- LOGIKA SKLADOVÁNÍ DAT V PROHLÍŽEČI ---
+        const SP = "yp-ai-";
+        const sGet = (key) => { const r = localStorage.getItem(SP + key); return r ? JSON.parse(r) : null; };
+        const sSet = (key, val) => localStorage.setItem(SP + key, JSON.stringify(val));
+
+        // --- HLAVNÍ KOMPONENTA APLIKACE ---
+        function AIAdvisoryBoard() {
+          const [screen, setScreen] = useState("home");
+          const [activeRole, setActiveRole] = useState(null);
+          const [debates, setDebates] = useState([]);
+          const [activeDebate, setActiveDebate] = useState(null);
+          const [messages, setMessages] = useState([]);
+          const [inputValue, setInputValue] = useState("");
+          const [loading, setLoading] = useState(false);
+          const chatEndRef = useRef(null);
+
+          useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+
+          const openRole = (roleId) => {
+            setActiveRole(roleId);
+            setScreen("chat");
+            const dl = sGet("debates-" + roleId) || [];
+            setDebates(dl);
+            if (dl.length > 0) {
+              const lastDebate = sGet("debate-" + dl[0].id);
+              setActiveDebate(lastDebate);
+              setMessages(lastDebate?.messages || []);
+            } else {
+              newDebate(roleId);
+            }
+          };
+
+          const newDebate = (roleId) => {
+            const rid = roleId || activeRole;
+            const d = { id: Date.now().toString(), roleId: rid, title: "Nova debata", messages: [] };
+            setActiveDebate(d);
+            setMessages([]);
+          };
+
+          const sendMessage = async () => {
+            if (!inputValue.trim() || loading) return;
+            const userMsg = { role: "user", text: inputValue };
+            const newMsgs = [...messages, userMsg];
+            setMessages(newMsgs);
+            setInputValue("");
+            setLoading(true);
+
+            // SIMULACE API VOLÁNÍ (Tady se později napojí tvůj Claude API klíč)
+            setTimeout(() => {
+                const aiMsg = { role: "ai", text: `Jako ${activeRole} jsem přijal zadání. Pro plnou funkci připojte API klíč. (Obsah promptu: ${SYSTEM_PROMPTS[activeRole]?.substring(0, 100)}...)` };
+                const finalMsgs = [...newMsgs, aiMsg];
+                setMessages(finalMsgs);
+                
+                const title = userMsg.text.substring(0, 30);
+                const updatedDebate = { ...activeDebate, messages: finalMsgs, title };
+                setActiveDebate(updatedDebate);
+                sSet("debate-" + updatedDebate.id, updatedDebate);
+                
+                let dl = sGet("debates-" + activeRole) || [];
+                if (!dl.find(x => x.id === updatedDebate.id)) dl.unshift({ id: updatedDebate.id, title });
+                sSet("debates-" + activeRole, dl);
+                setDebates(dl);
+                setLoading(false);
+            }, 1000);
+          };
+
+          if (screen === "home") {
+            return (
+              <div style={{ padding: "60px 20px", maxWidth: "1200px", margin: "0 auto", height: "100%", overflowY: "auto" }}>
+                <h1 style={{ textAlign: "center", fontSize: "32px", fontWeight: "300", marginBottom: "50px" }}>You&Place <span style={{fontWeight: "700"}}>Poradní sbor</span></h1>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "25px" }}>
+                  {ROLES.map(r => (
+                    <div key={r.id} onClick={() => openRole(r.id)} style={{ background: "rgba(255,255,255,0.03)", padding: "35px", borderRadius: "28px", border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer", transition: "0.3s" }}>
+                      <div style={{ color: r.color, fontSize: "28px", fontWeight: "700", marginBottom: "15px" }}>{r.initials}</div>
+                      <h3 style={{ margin: "0 0 5px 0", fontSize: "20px" }}>{r.title}</h3>
+                      <p style={{ color: r.color, fontSize: "13px", margin: "0 0 20px 0" }}>{r.subtitle}</p>
+                      <p style={{ fontSize: "14px", opacity: 0.5, lineHeight: "1.6" }}>{r.desc}</p>
+                    </div>
+                  ))}
+                  <div onClick={() => openRole("porada")} style={{ background: "linear-gradient(135deg, #1a1a1e 0%, #2a2a30 100%)", padding: "35px", borderRadius: "28px", border: "1px solid rgba(255,255,255,0.15)", cursor: "pointer" }}>
+                    <div style={{ fontSize: "28px", fontWeight: "700", marginBottom: "15px" }}>PS</div>
+                    <h3 style={{ margin: "0 0 5px 0", fontSize: "20px" }}>{PORADA.title}</h3>
+                    <p style={{ fontSize: "14px", opacity: 0.6 }}>{PORADA.desc}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          const currentRole = ROLES.find(r => r.id === activeRole) || PORADA;
+
+          return (
+            <div style={{ display: "flex", height: "100vh" }}>
+              {/* Sidebar */}
+              <div style={{ width: "300px", background: "#09090b", borderRight: "1px solid rgba(255,255,255,0.05)", display: "flex", flexDirection: "column" }}>
+                <div onClick={() => setScreen("home")} style={{ padding: "25px", cursor: "pointer", opacity: 0.6 }}>← Zpět do menu</div>
+                <div style={{ flex: 1, padding: "10px", overflowY: "auto" }}>
+                  <div style={{ fontSize: "11px", fontWeight: "700", opacity: 0.3, padding: "10px 15px", textTransform: "uppercase" }}>Historie debat</div>
+                  {debates.map(d => (
+                    <div key={d.id} onClick={() => { const full = sGet("debate-"+d.id); setActiveDebate(full); setMessages(full.messages); }} style={{ padding: "12px 15px", borderRadius: "12px", background: activeDebate?.id === d.id ? "rgba(255,255,255,0.05)" : "transparent", cursor: "pointer", marginBottom: "4px", fontSize: "13px" }}>{d.title}</div>
+                  ))}
+                </div>
+                <div onClick={() => newDebate()} style={{ padding: "20px", textAlign: "center", borderTop: "1px solid rgba(255,255,255,0.05)", cursor: "pointer", fontSize: "14px", fontWeight: "600" }}>+ Nová debata</div>
+              </div>
+
+              {/* Chat Area */}
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "#0d0d0f" }}>
+                <div style={{ padding: "25px 40px", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: "18px" }}>{currentRole.title}</h2>
+                    <span style={{ fontSize: "12px", color: currentRole.color || "#fff", opacity: 0.7 }}>{currentRole.subtitle}</span>
+                  </div>
+                </div>
+
+                <div style={{ flex: 1, overflowY: "auto", padding: "40px" }}>
+                  <div style={{ maxWidth: "800px", margin: "0 auto" }}>
+                    {messages.map((m, i) => (
+                      <div key={i} style={{ marginBottom: "35px", textAlign: m.role === "user" ? "right" : "left" }}>
+                        <div style={{ fontSize: "11px", fontWeight: "700", opacity: 0.3, marginBottom: "8px", textTransform: "uppercase" }}>{m.role === "user" ? "Vy" : currentRole.initials}</div>
+                        <div style={{ display: "inline-block", padding: "18px 24px", borderRadius: "22px", background: m.role === "user" ? "#fff" : "rgba(255,255,255,0.03)", color: m.role === "user" ? "#000" : "#fff", maxWidth: "85%", textAlign: "left", lineHeight: "1.7", fontSize: "15px" }}>{m.text}</div>
+                      </div>
+                    ))}
+                    {loading && <div style={{ opacity: 0.4, fontSize: "13px" }}>Expert připravuje analýzu...</div>}
+                    <div ref={chatEndRef} />
+                  </div>
+                </div>
+
+                <div style={{ padding: "30px 40px" }}>
+                  <div style={{ maxWidth: "800px", margin: "0 auto", display: "flex", gap: "15px", background: "rgba(255,255,255,0.03)", padding: "10px", borderRadius: "22px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                    <input value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendMessage()} placeholder="Zadejte dotaz..." style={{ flex: 1, background: "transparent", border: "none", padding: "12px 15px", color: "white", outline: "none", fontSize: "15px" }} />
+                    <button onClick={sendMessage} style={{ background: currentRole.color || "#fff", border: "none", color: "#000", padding: "0 25px", borderRadius: "15px", fontWeight: "700", cursor: "pointer" }}>Odeslat</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<AIAdvisoryBoard />);
+    </script>
+</body>
+</html>
