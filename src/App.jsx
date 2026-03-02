@@ -532,6 +532,32 @@ export default function AIAdvisoryBoard() {
     if ((!inputValue.trim() && chatAttachments.length === 0) || loading) return;
     let userText = inputValue.trim();
     
+    // Detekuj delegaci primo z user zpravy
+    const roleMap = { AS: "asistentka", FR: "financak", BA: "inovator", PR: "zadavatel", ST: "stavbar" };
+    const roleNames = { financak: "Financni reditel", asistentka: "Asistentka", inovator: "Business analytik", zadavatel: "Programator", stavbar: "Stavebni specialista" };
+    
+    const userDelegationPatterns = [
+      { pattern: /[Pp][řr]edej\s+to\s+[Aa]sistentce/i, role: "asistentka" },
+      { pattern: /[Pp][řr]edej\s+[Aa]sistentce/i, role: "asistentka" },
+      { pattern: /[Aa][ťt]\s+to\s+(ud[ěe]l[áa]|vypracuje|zpracuje)\s+[Aa]sistentka/i, role: "asistentka" },
+      { pattern: /[Aa][ťt]\s+to\s+[Aa]sistentka/i, role: "asistentka" },
+      { pattern: /[Pp][řr]edej\s+to\s+[Ff]inan[čc][áa]kovi/i, role: "financak" },
+      { pattern: /[Pp][řr]edej\s+to\s+[Ss]tavba[řr]ovi/i, role: "stavbar" },
+      { pattern: /[Pp][řr]edej\s+to\s+[Pp]rogram[áa]torovi/i, role: "zadavatel" },
+      { pattern: /[Pp][řr]edej\s+to\s+[Aa]nalytikovi/i, role: "inovator" },
+      { pattern: /[Řr]ekni\s+[Aa]sistentce/i, role: "asistentka" },
+      { pattern: /[Řr]ekni\s+[Ff]inan[čc][áa]kovi/i, role: "financak" },
+      { pattern: /[Řr]ekni\s+[Ss]tavba[řr]ovi/i, role: "stavbar" },
+    ];
+    
+    let directDelegation = null;
+    for (const dp of userDelegationPatterns) {
+      if (dp.pattern.test(userText)) {
+        directDelegation = dp.role;
+        break;
+      }
+    }
+    
     // Zpracuj prilohy podle typu
     const textAttachments = [];
     const mediaAttachments = [];
@@ -554,6 +580,49 @@ export default function AIAdvisoryBoard() {
     const userMsg = { role: "user", text: userText, attachments: chatAttachments.length > 0 ? chatAttachments.map(a => a.name) : undefined };
     const newMsgs = [...messages, userMsg];
     setMessages(newMsgs); setInputValue(""); setChatAttachments([]); setLoading(true);
+    
+    // Pokud user chce primo delegovat, udelej to
+    if (directDelegation && directDelegation !== activeRole) {
+      const currentRoleName = roleNames[activeRole] || "Kolega";
+      const colleaguePrompt = (SYSTEM_PROMPTS[directDelegation] || "") + buildFilesContext();
+      
+      // Predej kontext z predchozich zprav
+      const contextSummary = messages.slice(-4).map(m => m.text).join("\n\n");
+      const delegationMsg = [{ role: "user", text: `[Ukol od ${currentRoleName}]\n\nKontext z predchozi konverzace:\n${contextSummary}\n\nNovy ukol: ${userText}` }];
+      
+      const colleagueResponse = await callClaude(delegationMsg, colleaguePrompt, directDelegation);
+      const aiText = `**Predano ${roleNames[directDelegation]}:**\n\n${colleagueResponse}`;
+      
+      // Uloz vlakno kolegovi
+      const colleagueDebateId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+      const colleagueDebate = {
+        id: colleagueDebateId,
+        title: `Ukol od ${currentRoleName}: ${userText.substring(0, 40)}...`,
+        createdAt: new Date().toISOString(),
+        messages: [
+          { role: "user", text: `[Ukol od ${currentRoleName}] ${userText}` },
+          { role: "ai", text: colleagueResponse }
+        ]
+      };
+      await saveDebate(colleagueDebate);
+      let colleagueDebates = await loadDebateList(directDelegation);
+      colleagueDebates.unshift({ id: colleagueDebateId, title: colleagueDebate.title, createdAt: colleagueDebate.createdAt });
+      await saveDebateList(directDelegation, colleagueDebates);
+      
+      const aiMsg = { role: "ai", text: aiText };
+      const finalMsgs = [...newMsgs, aiMsg]; setMessages(finalMsgs);
+      let title = activeDebate?.title || "Nova debata";
+      if (title === "Nova debata" && finalMsgs.length >= 2) { title = finalMsgs[0].text.substring(0, 50) + (finalMsgs[0].text.length > 50 ? "..." : ""); }
+      const updatedDebate = { ...activeDebate, messages: finalMsgs, title };
+      setActiveDebate(updatedDebate); await saveDebate(updatedDebate);
+      let dl = await loadDebateList(activeRole);
+      const idx = dl.findIndex(d => d.id === updatedDebate.id);
+      const listItem = { id: updatedDebate.id, title, createdAt: updatedDebate.createdAt };
+      if (idx >= 0) { dl[idx] = listItem; } else { dl.unshift(listItem); }
+      await saveDebateList(activeRole, dl); setDebates(dl); setLoading(false);
+      return;
+    }
+    
     const basePrompt = activeRole === "porada" ? buildPoradaPrompt() : (SYSTEM_PROMPTS[activeRole] || "");
     const systemPrompt = basePrompt + buildFilesContext();
     let aiText = await callClaude(newMsgs, systemPrompt, activeRole, mediaAttachments);
