@@ -175,38 +175,26 @@ const PORADA = { id: "porada", title: "Porada", subtitle: "Vsichni poradci", des
 
 const font = "'Poppins', sans-serif";
 
-const MCP_GMAIL = { type: "url", url: "https://gmail.mcp.claude.com/mcp", name: "gmail" };
-const MCP_GCAL = { type: "url", url: "https://gcal.mcp.claude.com/mcp", name: "google-calendar" };
-
 async function callClaude(messages, systemPrompt, roleId) {
   try {
     const body = {
       model: "claude-sonnet-4-20250514",
       max_tokens: 4096,
       system: systemPrompt,
-      tools: [{ type: "web_search_20250305", name: "web_search" }],
-      mcp_servers: [MCP_GMAIL, MCP_GCAL],
       messages: messages.map(m => ({ role: m.role === "user" ? "user" : "assistant", content: m.text }))
     };
-    // Asistentka ma v promptu pravo zapisovat, ostatni jen ctou -- rizeni pres system prompt
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
     });
     const data = await res.json();
-    // Extrahuj text + tool results
+    if (data.error) {
+      return "Chyba: " + data.error;
+    }
     const parts = [];
     for (const block of (data.content || [])) {
       if (block.type === "text" && block.text) parts.push(block.text);
-      if (block.type === "mcp_tool_result" && block.content?.[0]?.text) {
-        try {
-          const parsed = JSON.parse(block.content[0].text);
-          parts.push("```\n" + JSON.stringify(parsed, null, 2).substring(0, 2000) + "\n```");
-        } catch {
-          parts.push(block.content[0].text.substring(0, 2000));
-        }
-      }
     }
     return parts.filter(Boolean).join("\n\n") || "Chyba pri zpracovani odpovedi.";
   } catch (err) {
