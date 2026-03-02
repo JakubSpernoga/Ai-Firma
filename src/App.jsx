@@ -560,12 +560,17 @@ export default function AIAdvisoryBoard() {
     
     // Preved prirozene fraze na delegacni tagy
     const naturalDelegations = [
-      { pattern: /[Pp]red[aá]v[aá]m\s+[Aa]sistentce:?\s*/g, replace: "[DELEGOVAT: AS] " },
-      { pattern: /[Pp]red[aá]v[aá]m\s+[Ff]inan[cč][aá]kovi:?\s*/g, replace: "[DELEGOVAT: FR] " },
-      { pattern: /[Pp]red[aá]v[aá]m\s+[Ss]tavba[rř]ovi:?\s*/g, replace: "[DELEGOVAT: ST] " },
-      { pattern: /[Pp]red[aá]v[aá]m\s+[Pp]rogramm?[aá]torovi:?\s*/g, replace: "[DELEGOVAT: PR] " },
-      { pattern: /[Pp]red[aá]v[aá]m\s+[Bb]usiness\s*[Aa]nalytikovi:?\s*/g, replace: "[DELEGOVAT: BA] " },
-      { pattern: /[Aa]sistentko,?\s*/g, replace: "[DELEGOVAT: AS] " },
+      { pattern: /[Pp][řr]ed[áa]v[áa]m\s+[Aa]sistentce[:\s]*/gi, replace: "[DELEGOVAT: AS] " },
+      { pattern: /[Pp][řr]ed[áa]v[áa]m\s+[Ff]inan[čc][áa]kovi[:\s]*/gi, replace: "[DELEGOVAT: FR] " },
+      { pattern: /[Pp][řr]ed[áa]v[áa]m\s+[Ss]tavba[řr]ovi[:\s]*/gi, replace: "[DELEGOVAT: ST] " },
+      { pattern: /[Pp][řr]ed[áa]v[áa]m\s+[Pp]rogram[áa]torovi[:\s]*/gi, replace: "[DELEGOVAT: PR] " },
+      { pattern: /[Pp][řr]ed[áa]v[áa]m\s+[Aa]nalytikovi[:\s]*/gi, replace: "[DELEGOVAT: BA] " },
+      { pattern: /[Pp][řr]ed[áa]v[áa]m\s+[Pp][řr][íi]mo[:\s]*/gi, replace: "[DELEGOVAT: AS] " },
+      { pattern: /[Aa]sistentce\s+k\s+(okam[žz]it[ée]mu\s+)?vypracov[áa]n[íi][:\s]*/gi, replace: "[DELEGOVAT: AS] " },
+      { pattern: /[Pp][Rr][Oo]\s+[Aa][Ss][Ii][Ss][Tt][Ee][Nn][Tt][Kk][Uu][:\s\-]*/gi, replace: "[DELEGOVAT: AS] " },
+      { pattern: /\*\*PRO ASISTENTKU[^*]*\*\*[:\s]*/gi, replace: "[DELEGOVAT: AS] " },
+      { pattern: /\*\*[ÚU]KOL PRO ASISTENTKU[^*]*\*\*[:\s]*/gi, replace: "[DELEGOVAT: AS] " },
+      { pattern: /[Aa]sistentko,\s*/gi, replace: "[DELEGOVAT: AS] " },
     ];
     for (const nd of naturalDelegations) {
       aiText = aiText.replace(nd.pattern, nd.replace);
