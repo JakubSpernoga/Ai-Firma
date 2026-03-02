@@ -193,8 +193,15 @@ PRAVIDLA EMAILU: NIKDY neposilej bez meho potvrzeni. Kazdy email: Komu, Predmet,
 
 CHOVANI: Sam analyzuj a navrhni odpoved. Formuluj: "Navrhuji odpovedet takto: [text]. Mam odeslat?" Bud proaktivni. Zadne emoji.
 
-GMAIL: Mas plny pristup. Cist, hledat, pripravovat koncepty odpovedi. NIKDY neodesilej email bez explicitniho potvrzeni od sefa. Vzdy ukazej navrh a cekej na souhlas.
-KALENDAR: Mas plny pristup. Cist udalosti, vytvarejx nove, upravovat existujici. Pred kazdou zmenou v kalendari ukazej navrh a cekej na potvrzeni. Kontroluj konflikty.
+VYTVARENI SOUBORU:
+Kdyz mas vytvorit dokument, email, smlouvu, nebo jiny soubor, pouzij tento format:
+[SOUBOR: nazev_souboru.txt]
+obsah souboru zde...
+[/SOUBOR]
+System automaticky vytvori soubor ke stazeni. Podporovane formaty: .txt, .md, .html, .csv, .json
+
+GMAIL: Pripravujes koncepty emailu. Vzdy ukazej navrh a vytvor soubor s emailem.
+KALENDAR: Pripravujes navrhy schuzek. Vzdy ukazej navrh a cekej na potvrzeni.
 
 TEAMOVA KOMUNIKACE:
 Kdyz sef rekne at neco predas kolegovi nebo at nekdo jiny neco udela, MUSIS to delegovat. Pouzij format:
@@ -401,6 +408,7 @@ export default function AIAdvisoryBoard() {
   const [files, setFiles] = useState([]);
   const [isMobile, setIsMobile] = useState(false);
   const [chatAttachments, setChatAttachments] = useState([]);
+  const [generatedFiles, setGeneratedFiles] = useState([]);
   const chatEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -549,6 +557,7 @@ export default function AIAdvisoryBoard() {
     // Zpracuj delegace - automaticky predej kolegum
     const roleMap = { FR: "financak", AS: "asistentka", BA: "inovator", PR: "zadavatel", ST: "stavbar" };
     const roleNames = { financak: "Financni reditel", asistentka: "Asistentka", inovator: "Business analytik", zadavatel: "Programator", stavbar: "Stavebni specialista" };
+    const currentRoleName = roleNames[activeRole] || "Kolega";
     const delegateRegex = /\[DELEGOVAT:\s*(FR|AS|BA|PR|ST)\]\s*(.+?)(?=\[DELEGOVAT:|$)/gs;
     let match;
     const delegations = [];
@@ -556,19 +565,50 @@ export default function AIAdvisoryBoard() {
       delegations.push({ role: roleMap[match[1]], task: match[2].trim() });
     }
     
-    // Proved delegace
+    // Proved delegace a uloz vlakna kolegum
     if (delegations.length > 0) {
       for (const del of delegations) {
         const colleaguePrompt = (SYSTEM_PROMPTS[del.role] || "") + buildFilesContext();
-        const colleagueMsg = [{ role: "user", text: `[Ukol od kolegy] ${del.task}` }];
+        const colleagueMsg = [{ role: "user", text: `[Ukol od ${currentRoleName}] ${del.task}` }];
         const colleagueResponse = await callClaude(colleagueMsg, colleaguePrompt, del.role);
         aiText += `\n\n---\n**${roleNames[del.role]} odpovida:**\n${colleagueResponse}`;
+        
+        // Uloz vlakno kolegovi
+        const colleagueDebateId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+        const colleagueDebate = {
+          id: colleagueDebateId,
+          title: `Ukol od ${currentRoleName}: ${del.task.substring(0, 40)}...`,
+          createdAt: new Date().toISOString(),
+          messages: [
+            { role: "user", text: `[Ukol od ${currentRoleName}] ${del.task}` },
+            { role: "ai", text: colleagueResponse }
+          ]
+        };
+        await saveDebate(colleagueDebate);
+        let colleagueDebates = await loadDebateList(del.role);
+        colleagueDebates.unshift({ id: colleagueDebateId, title: colleagueDebate.title, createdAt: colleagueDebate.createdAt });
+        await saveDebateList(del.role, colleagueDebates);
       }
       // Odstran delegacni tagy z puvodniho textu
       aiText = aiText.replace(delegateRegex, '');
     }
     
-    const aiMsg = { role: "ai", text: aiText };
+    // Zpracuj generovane soubory
+    const fileRegex = /\[SOUBOR:\s*([^\]]+)\]([\s\S]*?)\[\/SOUBOR\]/g;
+    let fileMatch;
+    const newFiles = [];
+    while ((fileMatch = fileRegex.exec(aiText)) !== null) {
+      const fileName = fileMatch[1].trim();
+      const fileContent = fileMatch[2].trim();
+      newFiles.push({ name: fileName, content: fileContent, createdAt: new Date().toISOString() });
+    }
+    if (newFiles.length > 0) {
+      setGeneratedFiles(prev => [...prev, ...newFiles]);
+      // Nahrad tagy odkazy na stazeni
+      aiText = aiText.replace(fileRegex, (match, name) => `**Soubor vytvoren: ${name.trim()}** (viz tlacitko Stahnout nize)`);
+    }
+    
+    const aiMsg = { role: "ai", text: aiText, files: newFiles.length > 0 ? newFiles : undefined };
     const finalMsgs = [...newMsgs, aiMsg]; setMessages(finalMsgs);
     let title = activeDebate?.title || "Nova debata";
     if (title === "Nova debata" && finalMsgs.length >= 2) { title = finalMsgs[0].text.substring(0, 50) + (finalMsgs[0].text.length > 50 ? "..." : ""); }
@@ -1018,7 +1058,19 @@ export default function AIAdvisoryBoard() {
             {messages.map((msg, i) => (
               <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", gap: "10px" }}>
                 {msg.role === "ai" && <div style={{ width: "28px", height: "28px", borderRadius: "8px", background: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", fontWeight: 600, color: "#fff", flexShrink: 0, marginTop: "2px" }}>{role?.initials}</div>}
-                <div style={{ maxWidth: "70%", padding: "14px 18px", borderRadius: msg.role === "user" ? "14px 14px 4px 14px" : "14px 14px 14px 4px", background: msg.role === "user" ? "#1a1a1a" : "#fff", color: msg.role === "user" ? "#fff" : "#1a1a1a", fontSize: "13px", fontWeight: 300, lineHeight: 1.7, boxShadow: msg.role === "ai" ? "0 2px 8px rgba(0,0,0,0.04)" : "none", whiteSpace: "pre-wrap" }}>{msg.text}</div>
+                <div style={{ maxWidth: "70%" }}>
+                  <div style={{ padding: "14px 18px", borderRadius: msg.role === "user" ? "14px 14px 4px 14px" : "14px 14px 14px 4px", background: msg.role === "user" ? "#1a1a1a" : "#fff", color: msg.role === "user" ? "#fff" : "#1a1a1a", fontSize: "13px", fontWeight: 300, lineHeight: 1.7, boxShadow: msg.role === "ai" ? "0 2px 8px rgba(0,0,0,0.04)" : "none", whiteSpace: "pre-wrap" }}>{msg.text}</div>
+                  {msg.files && msg.files.length > 0 && (
+                    <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
+                      {msg.files.map((f, fi) => (
+                        <a key={fi} href={`data:text/plain;charset=utf-8,${encodeURIComponent(f.content)}`} download={f.name} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px", background: "#1a1a1a", color: "#fff", borderRadius: "8px", fontSize: "11px", textDecoration: "none", cursor: "pointer" }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                          {f.name}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
             {loading && (
