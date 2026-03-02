@@ -1,4 +1,91 @@
 import { useState, useRef, useEffect } from "react";
+import * as XLSX from "xlsx";
+import * as mammoth from "mammoth";
+
+// Funkce pro parsovani ruznych typu souboru
+async function parseFile(file) {
+  const name = file.name.toLowerCase();
+  
+  // Excel soubory
+  if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv')) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          let result = '';
+          workbook.SheetNames.forEach(sheetName => {
+            result += `\n=== LIST: ${sheetName} ===\n`;
+            const sheet = workbook.Sheets[sheetName];
+            const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
+            result += csv;
+          });
+          resolve({ type: 'text', content: result });
+        } catch (err) {
+          resolve({ type: 'error', content: 'Chyba pri cteni Excel souboru: ' + err.message });
+        }
+      };
+      reader.onerror = () => resolve({ type: 'error', content: 'Chyba pri nacitani souboru' });
+      reader.readAsArrayBuffer(file);
+    });
+  }
+  
+  // Word soubory
+  if (name.endsWith('.docx')) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const result = await mammoth.extractRawText({ arrayBuffer: e.target.result });
+          resolve({ type: 'text', content: result.value });
+        } catch (err) {
+          resolve({ type: 'error', content: 'Chyba pri cteni Word souboru: ' + err.message });
+        }
+      };
+      reader.onerror = () => resolve({ type: 'error', content: 'Chyba pri nacitani souboru' });
+      reader.readAsArrayBuffer(file);
+    });
+  }
+  
+  // Textove soubory
+  if (name.endsWith('.txt') || name.endsWith('.md') || name.endsWith('.json') || name.endsWith('.csv')) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve({ type: 'text', content: e.target.result });
+      reader.onerror = () => resolve({ type: 'error', content: 'Chyba pri nacitani souboru' });
+      reader.readAsText(file);
+    });
+  }
+  
+  // PDF - base64 pro AI (Claude umi cist PDF primo)
+  if (name.endsWith('.pdf')) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve({ type: 'pdf', content: e.target.result });
+      reader.onerror = () => resolve({ type: 'error', content: 'Chyba pri nacitani PDF' });
+      reader.readAsDataURL(file);
+    });
+  }
+  
+  // Obrazky - base64
+  if (name.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve({ type: 'image', content: e.target.result });
+      reader.onerror = () => resolve({ type: 'error', content: 'Chyba pri nacitani obrazku' });
+      reader.readAsDataURL(file);
+    });
+  }
+  
+  // Ostatni - pokus o text
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve({ type: 'text', content: e.target.result });
+    reader.onerror = () => resolve({ type: 'binary', content: null });
+    reader.readAsText(file);
+  });
+}
 
 const SYSTEM_PROMPTS = {
   financak: `Jsi Financni reditel a danovy poradce ceske stavebni firmy You&Place. Komunikujes VZDY cesky. Mas uroven CFO z Big4 kombinovanou s 20+ lety praxe v danovem poradenstvi pro stavebni firmy v CR.
@@ -175,14 +262,50 @@ const PORADA = { id: "porada", title: "Porada", subtitle: "Vsichni poradci", des
 
 const font = "'Poppins', sans-serif";
 
-async function callClaude(messages, systemPrompt, roleId) {
+async function callClaude(messages, systemPrompt, roleId, mediaAttachments = []) {
   try {
+    // Vytvor zpravy s podporou multimodalnich vstupu
+    const formattedMessages = messages.map((m, idx) => {
+      if (m.role === "user") {
+        // Posledni user zprava muze obsahovat prilohy
+        if (idx === messages.length - 1 && mediaAttachments.length > 0) {
+          const content = [];
+          
+          // Pridej obrazky a PDF
+          for (const media of mediaAttachments) {
+            if (media.type === 'image') {
+              const base64Data = media.data.split(',')[1];
+              const mediaType = media.data.split(';')[0].split(':')[1];
+              content.push({
+                type: "image",
+                source: { type: "base64", media_type: mediaType, data: base64Data }
+              });
+            } else if (media.type === 'pdf') {
+              const base64Data = media.data.split(',')[1];
+              content.push({
+                type: "document",
+                source: { type: "base64", media_type: "application/pdf", data: base64Data }
+              });
+            }
+          }
+          
+          // Pridej text
+          content.push({ type: "text", text: m.text });
+          
+          return { role: "user", content };
+        }
+        return { role: "user", content: m.text };
+      }
+      return { role: "assistant", content: m.text };
+    });
+
     const body = {
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4096,
+      model: "claude-opus-4-20250514",
+      max_tokens: 16000,
       system: systemPrompt,
-      messages: messages.map(m => ({ role: m.role === "user" ? "user" : "assistant", content: m.text }))
+      messages: formattedMessages
     };
+    
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -190,7 +313,7 @@ async function callClaude(messages, systemPrompt, roleId) {
     });
     const data = await res.json();
     if (data.error) {
-      return "Chyba: " + data.error;
+      return "Chyba: " + (data.error.message || data.error);
     }
     const parts = [];
     for (const block of (data.content || [])) {
@@ -334,17 +457,13 @@ export default function AIAdvisoryBoard() {
     const droppedFiles = Array.from(e.dataTransfer?.files || []);
     const newAttachments = [];
     for (const f of droppedFiles) {
-      const content = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => resolve(null);
-        if (f.type.startsWith('text/') || f.name.endsWith('.txt') || f.name.endsWith('.md') || f.name.endsWith('.json') || f.name.endsWith('.csv')) {
-          reader.readAsText(f);
-        } else {
-          reader.readAsDataURL(f);
-        }
+      const parsed = await parseFile(f);
+      newAttachments.push({ 
+        name: f.name, 
+        content: parsed.content, 
+        type: f.type,
+        parsedType: parsed.type 
       });
-      newAttachments.push({ name: f.name, content, type: f.type });
     }
     setChatAttachments(prev => [...prev, ...newAttachments]);
   };
@@ -353,17 +472,13 @@ export default function AIAdvisoryBoard() {
     const selectedFiles = Array.from(e.target.files || []);
     const newAttachments = [];
     for (const f of selectedFiles) {
-      const content = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => resolve(null);
-        if (f.type.startsWith('text/') || f.name.endsWith('.txt') || f.name.endsWith('.md') || f.name.endsWith('.json') || f.name.endsWith('.csv')) {
-          reader.readAsText(f);
-        } else {
-          reader.readAsDataURL(f);
-        }
+      const parsed = await parseFile(f);
+      newAttachments.push({ 
+        name: f.name, 
+        content: parsed.content, 
+        type: f.type,
+        parsedType: parsed.type 
       });
-      newAttachments.push({ name: f.name, content, type: f.type });
     }
     setChatAttachments(prev => [...prev, ...newAttachments]);
     e.target.value = '';
@@ -372,21 +487,32 @@ export default function AIAdvisoryBoard() {
   const sendMessage = async () => {
     if ((!inputValue.trim() && chatAttachments.length === 0) || loading) return;
     let userText = inputValue.trim();
-    if (chatAttachments.length > 0) {
-      const attachmentInfo = chatAttachments.map(a => {
-        if (a.content && !a.content.startsWith('data:')) {
-          return `\n\n[Priloha: ${a.name}]\n${a.content.substring(0, 5000)}${a.content.length > 5000 ? '...(zkraceno)' : ''}`;
-        }
-        return `\n\n[Priloha: ${a.name} (binarni soubor)]`;
-      }).join('');
-      userText += attachmentInfo;
+    
+    // Zpracuj prilohy podle typu
+    const textAttachments = [];
+    const mediaAttachments = [];
+    
+    for (const a of chatAttachments) {
+      if (a.parsedType === 'text' && a.content) {
+        textAttachments.push(`\n\n=== SOUBOR: ${a.name} ===\n${a.content}`);
+      } else if (a.parsedType === 'image' && a.content) {
+        mediaAttachments.push({ type: 'image', name: a.name, data: a.content });
+      } else if (a.parsedType === 'pdf' && a.content) {
+        mediaAttachments.push({ type: 'pdf', name: a.name, data: a.content });
+      } else {
+        textAttachments.push(`\n\n[Priloha: ${a.name} - nepodporovany format]`);
+      }
+    }
+    
+    if (textAttachments.length > 0) {
+      userText += textAttachments.join('');
     }
     const userMsg = { role: "user", text: userText, attachments: chatAttachments.length > 0 ? chatAttachments.map(a => a.name) : undefined };
     const newMsgs = [...messages, userMsg];
     setMessages(newMsgs); setInputValue(""); setChatAttachments([]); setLoading(true);
     const basePrompt = activeRole === "porada" ? buildPoradaPrompt() : (SYSTEM_PROMPTS[activeRole] || "");
     const systemPrompt = basePrompt + buildFilesContext();
-    const aiText = await callClaude(newMsgs, systemPrompt, activeRole);
+    const aiText = await callClaude(newMsgs, systemPrompt, activeRole, mediaAttachments);
     const aiMsg = { role: "ai", text: aiText };
     const finalMsgs = [...newMsgs, aiMsg]; setMessages(finalMsgs);
     let title = activeDebate?.title || "Nova debata";
