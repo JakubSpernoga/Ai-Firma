@@ -245,7 +245,9 @@ export default function AIAdvisoryBoard() {
   const [poradaMembers, setPoradaMembers] = useState(["financak", "asistentka", "inovator", "zadavatel", "stavbar"]);
   const [files, setFiles] = useState([]);
   const [isMobile, setIsMobile] = useState(false);
+  const [chatAttachments, setChatAttachments] = useState([]);
   const chatEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth <= 768);
@@ -326,11 +328,62 @@ export default function AIAdvisoryBoard() {
     return ctx;
   };
 
+  const handleChatFileDrop = async (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const droppedFiles = Array.from(e.dataTransfer?.files || []);
+    const newAttachments = [];
+    for (const f of droppedFiles) {
+      const content = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => resolve(null);
+        if (f.type.startsWith('text/') || f.name.endsWith('.txt') || f.name.endsWith('.md') || f.name.endsWith('.json') || f.name.endsWith('.csv')) {
+          reader.readAsText(f);
+        } else {
+          reader.readAsDataURL(f);
+        }
+      });
+      newAttachments.push({ name: f.name, content, type: f.type });
+    }
+    setChatAttachments(prev => [...prev, ...newAttachments]);
+  };
+
+  const handleFileInputChange = async (e) => {
+    const selectedFiles = Array.from(e.target.files || []);
+    const newAttachments = [];
+    for (const f of selectedFiles) {
+      const content = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => resolve(null);
+        if (f.type.startsWith('text/') || f.name.endsWith('.txt') || f.name.endsWith('.md') || f.name.endsWith('.json') || f.name.endsWith('.csv')) {
+          reader.readAsText(f);
+        } else {
+          reader.readAsDataURL(f);
+        }
+      });
+      newAttachments.push({ name: f.name, content, type: f.type });
+    }
+    setChatAttachments(prev => [...prev, ...newAttachments]);
+    e.target.value = '';
+  };
+
   const sendMessage = async () => {
-    if (!inputValue.trim() || loading) return;
-    const userMsg = { role: "user", text: inputValue.trim() };
+    if ((!inputValue.trim() && chatAttachments.length === 0) || loading) return;
+    let userText = inputValue.trim();
+    if (chatAttachments.length > 0) {
+      const attachmentInfo = chatAttachments.map(a => {
+        if (a.content && !a.content.startsWith('data:')) {
+          return `\n\n[Priloha: ${a.name}]\n${a.content.substring(0, 5000)}${a.content.length > 5000 ? '...(zkraceno)' : ''}`;
+        }
+        return `\n\n[Priloha: ${a.name} (binarni soubor)]`;
+      }).join('');
+      userText += attachmentInfo;
+    }
+    const userMsg = { role: "user", text: userText, attachments: chatAttachments.length > 0 ? chatAttachments.map(a => a.name) : undefined };
     const newMsgs = [...messages, userMsg];
-    setMessages(newMsgs); setInputValue(""); setLoading(true);
+    setMessages(newMsgs); setInputValue(""); setChatAttachments([]); setLoading(true);
     const basePrompt = activeRole === "porada" ? buildPoradaPrompt() : (SYSTEM_PROMPTS[activeRole] || "");
     const systemPrompt = basePrompt + buildFilesContext();
     const aiText = await callClaude(newMsgs, systemPrompt, activeRole);
@@ -460,14 +513,29 @@ export default function AIAdvisoryBoard() {
     const handleFileDrop = async (e) => {
       e.preventDefault();
       const droppedFiles = Array.from(e.dataTransfer?.files || []);
-      const newFiles = droppedFiles.map(f => ({
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-        name: f.name,
-        size: f.size,
-        category: categorizeFile(f.name),
-        addedAt: new Date().toISOString(),
-        driveStatus: "ceka" // ceka / nahrano / chyba
-      }));
+      const newFiles = [];
+      for (const f of droppedFiles) {
+        const content = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => resolve(null);
+          if (f.type.startsWith('text/') || f.name.endsWith('.txt') || f.name.endsWith('.md') || f.name.endsWith('.json') || f.name.endsWith('.csv')) {
+            reader.readAsText(f);
+          } else {
+            reader.readAsDataURL(f);
+          }
+        });
+        newFiles.push({
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+          name: f.name,
+          size: f.size,
+          type: f.type,
+          content: content,
+          category: categorizeFile(f.name),
+          addedAt: new Date().toISOString(),
+          driveStatus: "lokalni"
+        });
+      }
       const updated = [...files, ...newFiles];
       setFiles(updated);
       await sSet("files-list", updated);
@@ -482,9 +550,39 @@ export default function AIAdvisoryBoard() {
       setFiles(updated);
       await sSet("files-list", updated);
     };
+    const [viewingFile, setViewingFile] = useState(null);
+    
+    const FileViewerModal = () => (
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }} onClick={() => setViewingFile(null)}>
+        <div style={{ background: "#fff", borderRadius: "16px", width: "100%", maxWidth: "800px", maxHeight: "80vh", overflow: "hidden", display: "flex", flexDirection: "column" }} onClick={e => e.stopPropagation()}>
+          <div style={{ padding: "20px 24px", borderBottom: "1px solid rgba(0,0,0,0.06)", display: "flex", alignItems: "center", gap: "12px" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <div style={{ flex: 1, fontSize: "14px", fontWeight: 600, color: "#1a1a1a" }}>{viewingFile?.name}</div>
+            <div onClick={() => setViewingFile(null)} style={{ width: "32px", height: "32px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", background: "rgba(0,0,0,0.05)" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </div>
+          </div>
+          <div style={{ flex: 1, overflow: "auto", padding: "20px 24px" }}>
+            {viewingFile?.content?.startsWith('data:image') ? (
+              <img src={viewingFile.content} alt={viewingFile.name} style={{ maxWidth: "100%", borderRadius: "8px" }} />
+            ) : viewingFile?.content?.startsWith('data:') ? (
+              <div style={{ textAlign: "center", padding: "40px", color: "rgba(0,0,0,0.4)" }}>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.2)" strokeWidth="1.5" style={{ margin: "0 auto 12px" }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <div style={{ fontSize: "13px" }}>Nahled neni k dispozici</div>
+                <a href={viewingFile.content} download={viewingFile.name} style={{ display: "inline-block", marginTop: "12px", padding: "10px 20px", background: "#1a1a1a", color: "#fff", borderRadius: "8px", fontSize: "12px", textDecoration: "none" }}>Stahnout soubor</a>
+              </div>
+            ) : (
+              <pre style={{ fontSize: "12px", fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-word", color: "#1a1a1a", margin: 0, lineHeight: 1.6 }}>{viewingFile?.content || "Obsah neni k dispozici"}</pre>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+    
     return (
       <div style={{ fontFamily: font, background: "#0d0d0f", width: "100%", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", boxSizing: "border-box" }}>
         <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+        {viewingFile && <FileViewerModal />}
         <div style={{ width: "100%", maxWidth: "1400px", height: "calc(100vh - 40px)", borderRadius: "16px", overflow: "hidden", boxShadow: "0 80px 180px rgba(0,0,0,0.7)", background: "#f8f8f8", display: "flex", flexDirection: "column" }}>
           <div style={{ padding: "24px 32px", background: "#fff", borderBottom: "1px solid rgba(0,0,0,0.06)", display: "flex", alignItems: "center", gap: "14px" }}>
             <div onClick={() => setScreen("home")} style={{ width: "38px", height: "38px", borderRadius: "10px", border: "1px solid rgba(0,0,0,0.08)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
@@ -528,11 +626,13 @@ export default function AIAdvisoryBoard() {
                       <div style={{ fontSize: "11px", color: "rgba(0,0,0,0.15)", textAlign: "center", padding: "12px 0" }}>Zadne soubory</div>
                     )}
                     {catFiles.map(f => (
-                      <div key={f.id} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 10px", borderRadius: "8px", marginBottom: "4px", background: "rgba(0,0,0,0.02)" }}>
+                      <div key={f.id} onClick={() => setViewingFile(f)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 10px", borderRadius: "8px", marginBottom: "4px", background: "rgba(0,0,0,0.02)", cursor: "pointer", transition: "background 0.15s" }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.02)"; }}>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.3)" strokeWidth="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                         <div style={{ flex: 1, fontSize: "11px", fontWeight: 400, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.name}</div>
                         <div style={{ fontSize: "9px", color: f.driveStatus === "nahrano" ? "rgba(45,90,39,0.6)" : "rgba(0,0,0,0.2)" }}>{f.driveStatus === "nahrano" ? "Drive" : "lokalni"}</div>
-                        <div onClick={() => removeFile(f.id)} style={{ width: "20px", height: "20px", borderRadius: "5px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", opacity: 0.3, transition: "opacity 0.15s" }}
+                        <div onClick={(e) => { e.stopPropagation(); removeFile(f.id); }} style={{ width: "20px", height: "20px", borderRadius: "5px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", opacity: 0.3, transition: "opacity 0.15s" }}
                           onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
                           onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.3"; }}>
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.5)" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
@@ -753,12 +853,26 @@ export default function AIAdvisoryBoard() {
             <div ref={chatEndRef} />
           </div>
           <div style={{ padding: isMobile ? "12px 16px 20px" : "16px 32px 24px", background: dragOver ? "rgba(26,26,26,0.04)" : "transparent" }}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={(e) => { e.preventDefault(); setDragOver(false); }}>
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={handleChatFileDrop}>
             {dragOver && <div style={{ textAlign: "center", padding: "12px", fontSize: "12px", color: "rgba(0,0,0,0.3)", border: "2px dashed rgba(0,0,0,0.1)", borderRadius: "12px", marginBottom: "8px" }}>Pust soubor sem</div>}
+            {chatAttachments.length > 0 && (
+              <div style={{ display: "flex", gap: "8px", marginBottom: "8px", flexWrap: "wrap" }}>
+                {chatAttachments.map((a, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 10px", background: "#f0f0f0", borderRadius: "8px", fontSize: "11px", color: "#1a1a1a" }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    {a.name}
+                    <div onClick={() => setChatAttachments(prev => prev.filter((_, j) => j !== i))} style={{ cursor: "pointer", opacity: 0.5 }}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "#fff", borderRadius: "14px", padding: "6px 6px 6px 16px", border: "1px solid rgba(0,0,0,0.08)", boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
-              {!isMobile && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.25)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ cursor: "pointer", flexShrink: 0 }}><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>}
+              <input type="file" ref={fileInputRef} onChange={handleFileInputChange} multiple style={{ display: "none" }} />
+              <svg onClick={() => fileInputRef.current?.click()} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.25)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ cursor: "pointer", flexShrink: 0 }}><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
               <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={handleKeyDown} placeholder={isMobile ? "Napis zpravu..." : `Zeptej se: ${role?.title || ""}...`} style={{ flex: 1, border: "none", outline: "none", fontFamily: font, fontSize: "13px", color: "#1a1a1a", background: "transparent" }} />
-              <button onClick={sendMessage} disabled={loading || !inputValue.trim()} style={{ width: "38px", height: "38px", borderRadius: "10px", background: loading || !inputValue.trim() ? "rgba(26,26,26,0.3)" : "#1a1a1a", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: loading ? "wait" : "pointer", flexShrink: 0, transition: "background 0.2s" }}>
+              <button onClick={sendMessage} disabled={loading || (!inputValue.trim() && chatAttachments.length === 0)} style={{ width: "38px", height: "38px", borderRadius: "10px", background: loading || (!inputValue.trim() && chatAttachments.length === 0) ? "rgba(26,26,26,0.3)" : "#1a1a1a", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: loading ? "wait" : "pointer", flexShrink: 0, transition: "background 0.2s" }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
               </button>
             </div>
