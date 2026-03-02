@@ -650,9 +650,7 @@ export default function AIAdvisoryBoard() {
       aiText = aiText.replace(nd.pattern, nd.replace);
     }
     
-    // Zpracuj delegace - automaticky predej kolegum
-    const roleMap = { FR: "financak", AS: "asistentka", BA: "inovator", PR: "zadavatel", ST: "stavbar" };
-    const roleNames = { financak: "Financni reditel", asistentka: "Asistentka", inovator: "Business analytik", zadavatel: "Programator", stavbar: "Stavebni specialista" };
+    // Zpracuj delegace - automaticky predej kolegum (roleMap a roleNames uz jsou definovane vyse)
     const currentRoleName = roleNames[activeRole] || "Kolega";
     const delegateRegex = /\[DELEGOVAT:\s*(FR|AS|BA|PR|ST)\]\s*(.+?)(?=\[DELEGOVAT:|$)/gs;
     let match;
