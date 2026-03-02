@@ -560,14 +560,19 @@ export default function AIAdvisoryBoard() {
     
     // Preved prirozene fraze na delegacni tagy
     const naturalDelegations = [
+      { pattern: /[Pp][řr]ed[áa]v[áa]m\s+[úu]kol\s+[Pp][řr][íi]mo\s+[Aa]sistentce[:\s]*/gi, replace: "[DELEGOVAT: AS] " },
+      { pattern: /[Pp][řr]ed[áa]v[áa]m\s+[Pp][řr][íi]mo\s+[Aa]sistentce[:\s]*/gi, replace: "[DELEGOVAT: AS] " },
       { pattern: /[Pp][řr]ed[áa]v[áa]m\s+[Aa]sistentce[:\s]*/gi, replace: "[DELEGOVAT: AS] " },
       { pattern: /[Pp][řr]ed[áa]v[áa]m\s+[Ff]inan[čc][áa]kovi[:\s]*/gi, replace: "[DELEGOVAT: FR] " },
       { pattern: /[Pp][řr]ed[áa]v[áa]m\s+[Ss]tavba[řr]ovi[:\s]*/gi, replace: "[DELEGOVAT: ST] " },
       { pattern: /[Pp][řr]ed[áa]v[áa]m\s+[Pp]rogram[áa]torovi[:\s]*/gi, replace: "[DELEGOVAT: PR] " },
       { pattern: /[Pp][řr]ed[áa]v[áa]m\s+[Aa]nalytikovi[:\s]*/gi, replace: "[DELEGOVAT: BA] " },
-      { pattern: /[Pp][řr]ed[áa]v[áa]m\s+[Pp][řr][íi]mo[:\s]*/gi, replace: "[DELEGOVAT: AS] " },
+      { pattern: /@[Aa]sistentka[:\s\-]*/gi, replace: "[DELEGOVAT: AS] " },
+      { pattern: /@[Ff]inan[čc][áa]k[:\s\-]*/gi, replace: "[DELEGOVAT: FR] " },
+      { pattern: /@[Ss]tavba[řr][:\s\-]*/gi, replace: "[DELEGOVAT: ST] " },
+      { pattern: /@[Pp]rogram[áa]tor[:\s\-]*/gi, replace: "[DELEGOVAT: PR] " },
+      { pattern: /@[Aa]nalytik[:\s\-]*/gi, replace: "[DELEGOVAT: BA] " },
       { pattern: /[Aa]sistentce\s+k\s+(okam[žz]it[ée]mu\s+)?vypracov[áa]n[íi][:\s]*/gi, replace: "[DELEGOVAT: AS] " },
-      { pattern: /[Pp][Rr][Oo]\s+[Aa][Ss][Ii][Ss][Tt][Ee][Nn][Tt][Kk][Uu][:\s\-]*/gi, replace: "[DELEGOVAT: AS] " },
       { pattern: /\*\*PRO ASISTENTKU[^*]*\*\*[:\s]*/gi, replace: "[DELEGOVAT: AS] " },
       { pattern: /\*\*[ÚU]KOL PRO ASISTENTKU[^*]*\*\*[:\s]*/gi, replace: "[DELEGOVAT: AS] " },
       { pattern: /[Aa]sistentko,\s*/gi, replace: "[DELEGOVAT: AS] " },
