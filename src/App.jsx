@@ -174,7 +174,14 @@ CHOVANI -- PROAKTIVNI CFO:
 - Pri prvnim kontaktu se AKTIVNE ZEPTEJ na informace ktere potrebujes vedet o firme -- DPH rezim, zpusob fakturace, pausalni/skutecne vydaje, fixni naklady. Sestavuj si financni profil firmy.
 - Zadne emoji. Strucne, vecne, profesionalne. Cisla formatuj prehledne.
 
-GMAIL/KALENDAR: Mas pristup ke cteni emailu a kalendare. Muzes si precist emaily a schuzky pro kontext. NIKDY neodesilej emaily ani nevytvarej udalosti -- to dela jen Asistentka.`,
+GMAIL/KALENDAR: Mas pristup ke cteni emailu a kalendare. Muzes si precist emaily a schuzky pro kontext. NIKDY neodesilej emaily ani nevytvarej udalosti -- to dela jen Asistentka.
+
+TEAMOVA KOMUNIKACE:
+Kdyz sef rekne at neco predas kolegovi nebo at nekdo jiny neco udela, MUSIS to delegovat. Pouzij format:
+[DELEGOVAT: ROLE] ukol nebo zprava
+Napriklad: "[DELEGOVAT: AS] Posli email dodavateli ohledne faktury 2024-001"
+Role: FR=Financak, AS=Asistentka, BA=Business analytik, PR=Programator, ST=Stavbar
+System automaticky preda ukol spravnemu kolegovi a vrati ti jeho odpoved.`,
 
   asistentka: `Jsi Executive Assistant ceske stavebni firmy You&Place. VZDY cesky. Uroven EA z Fortune 500.
 
@@ -187,7 +194,14 @@ PRAVIDLA EMAILU: NIKDY neposilej bez meho potvrzeni. Kazdy email: Komu, Predmet,
 CHOVANI: Sam analyzuj a navrhni odpoved. Formuluj: "Navrhuji odpovedet takto: [text]. Mam odeslat?" Bud proaktivni. Zadne emoji.
 
 GMAIL: Mas plny pristup. Cist, hledat, pripravovat koncepty odpovedi. NIKDY neodesilej email bez explicitniho potvrzeni od sefa. Vzdy ukazej navrh a cekej na souhlas.
-KALENDAR: Mas plny pristup. Cist udalosti, vytvarejx nove, upravovat existujici. Pred kazdou zmenou v kalendari ukazej navrh a cekej na potvrzeni. Kontroluj konflikty.`,
+KALENDAR: Mas plny pristup. Cist udalosti, vytvarejx nove, upravovat existujici. Pred kazdou zmenou v kalendari ukazej navrh a cekej na potvrzeni. Kontroluj konflikty.
+
+TEAMOVA KOMUNIKACE:
+Kdyz sef rekne at neco predas kolegovi nebo at nekdo jiny neco udela, MUSIS to delegovat. Pouzij format:
+[DELEGOVAT: ROLE] ukol nebo zprava
+Napriklad: "[DELEGOVAT: FR] Zkontroluj DPH na teto fakture"
+Role: FR=Financak, AS=Asistentka, BA=Business analytik, PR=Programator, ST=Stavbar
+System automaticky preda ukol spravnemu kolegovi a vrati ti jeho odpoved.`,
 
   inovator: `Jsi Business Analytik ceske stavebni firmy You&Place. VZDY cesky. Premyslis jako McKinsey/BCG konzultant.
 
@@ -202,7 +216,13 @@ Kazdy napad MUSI: 1.CO RESI 2.KOLIK STOJI 3.JAK DLOUHO 4.PRINOS KC 5.RIZIKO 6.PR
 
 CHOVANI: Sam identifikuj prilezitosti. Nedavej otazky - dej navrh s cislama. Zadne emoji.
 
-GMAIL/KALENDAR: Mas pristup ke cteni. Muzes cist emaily a schuzky pro kontext analyzy. NIKDY neodesilej emaily ani nevytvarej udalosti.`,
+GMAIL/KALENDAR: Mas pristup ke cteni. Muzes cist emaily a schuzky pro kontext analyzy. NIKDY neodesilej emaily ani nevytvarej udalosti.
+
+TEAMOVA KOMUNIKACE:
+Kdyz sef rekne at neco predas kolegovi nebo at nekdo jiny neco udela, MUSIS to delegovat. Pouzij format:
+[DELEGOVAT: ROLE] ukol nebo zprava
+Role: FR=Financak, AS=Asistentka, BA=Business analytik, PR=Programator, ST=Stavbar
+System automaticky preda ukol spravnemu kolegovi a vrati ti jeho odpoved.`,
 
   zadavatel: `Jsi Senior Technical PM a System Architekt. VZDY cesky. 15+ let zkusenosti.
 
@@ -215,7 +235,13 @@ SABLONA: ## CIL ## KONTEXT ## TECH STACK ## DESIGN ## STRUKTURA ## FUNKCIONALITA
 
 CHOVANI: Sam priprav kompletni prompt pro Claude Code. Zadne emoji.
 
-GMAIL/KALENDAR: Mas pristup ke cteni. Muzes cist emaily a schuzky pro kontext. NIKDY neodesilej emaily ani nevytvarej udalosti.`,
+GMAIL/KALENDAR: Mas pristup ke cteni. Muzes cist emaily a schuzky pro kontext. NIKDY neodesilej emaily ani nevytvarej udalosti.
+
+TEAMOVA KOMUNIKACE:
+Kdyz sef rekne at neco predas kolegovi nebo at nekdo jiny neco udela, MUSIS to delegovat. Pouzij format:
+[DELEGOVAT: ROLE] ukol nebo zprava
+Role: FR=Financak, AS=Asistentka, BA=Business analytik, PR=Programator, ST=Stavbar
+System automaticky preda ukol spravnemu kolegovi a vrati ti jeho odpoved.`,
 
   stavbar: `Jsi Autorizovany stavebni inzenyr 25+ let praxe. VZDY cesky. Rekonstrukce, interiery, panelove domy.
 
@@ -232,7 +258,13 @@ U KAZDEHO materialu: presny nazev, vyrobce, spotreba/m2 dle TL, postup dle TL. R
 
 CHOVANI: Dam KOMPLETNI POSTUP vcetne materialu. Kdyz vidim problem, SAM upozornim. Zadne emoji.
 
-GMAIL/KALENDAR: Mas pristup ke cteni. Muzes cist emaily a schuzky pro kontext. NIKDY neodesilej emaily ani nevytvarej udalosti.`
+GMAIL/KALENDAR: Mas pristup ke cteni. Muzes cist emaily a schuzky pro kontext. NIKDY neodesilej emaily ani nevytvarej udalosti.
+
+TEAMOVA KOMUNIKACE:
+Kdyz sef rekne at neco predas kolegovi nebo at nekdo jiny neco udela, MUSIS to delegovat. Pouzij format:
+[DELEGOVAT: ROLE] ukol nebo zprava
+Role: FR=Financak, AS=Asistentka, BA=Business analytik, PR=Programator, ST=Stavbar
+System automaticky preda ukol spravnemu kolegovi a vrati ti jeho odpoved.`
 };
 
 const PORADA_PROMPT = `Moderator porady You&Place. Pritomni:
@@ -512,7 +544,30 @@ export default function AIAdvisoryBoard() {
     setMessages(newMsgs); setInputValue(""); setChatAttachments([]); setLoading(true);
     const basePrompt = activeRole === "porada" ? buildPoradaPrompt() : (SYSTEM_PROMPTS[activeRole] || "");
     const systemPrompt = basePrompt + buildFilesContext();
-    const aiText = await callClaude(newMsgs, systemPrompt, activeRole, mediaAttachments);
+    let aiText = await callClaude(newMsgs, systemPrompt, activeRole, mediaAttachments);
+    
+    // Zpracuj delegace - automaticky predej kolegum
+    const roleMap = { FR: "financak", AS: "asistentka", BA: "inovator", PR: "zadavatel", ST: "stavbar" };
+    const roleNames = { financak: "Financni reditel", asistentka: "Asistentka", inovator: "Business analytik", zadavatel: "Programator", stavbar: "Stavebni specialista" };
+    const delegateRegex = /\[DELEGOVAT:\s*(FR|AS|BA|PR|ST)\]\s*(.+?)(?=\[DELEGOVAT:|$)/gs;
+    let match;
+    const delegations = [];
+    while ((match = delegateRegex.exec(aiText)) !== null) {
+      delegations.push({ role: roleMap[match[1]], task: match[2].trim() });
+    }
+    
+    // Proved delegace
+    if (delegations.length > 0) {
+      for (const del of delegations) {
+        const colleaguePrompt = (SYSTEM_PROMPTS[del.role] || "") + buildFilesContext();
+        const colleagueMsg = [{ role: "user", text: `[Ukol od kolegy] ${del.task}` }];
+        const colleagueResponse = await callClaude(colleagueMsg, colleaguePrompt, del.role);
+        aiText += `\n\n---\n**${roleNames[del.role]} odpovida:**\n${colleagueResponse}`;
+      }
+      // Odstran delegacni tagy z puvodniho textu
+      aiText = aiText.replace(delegateRegex, '');
+    }
+    
     const aiMsg = { role: "ai", text: aiText };
     const finalMsgs = [...newMsgs, aiMsg]; setMessages(finalMsgs);
     let title = activeDebate?.title || "Nova debata";
