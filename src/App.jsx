@@ -413,6 +413,8 @@ export default function AIAdvisoryBoard() {
   const [isMobile, setIsMobile] = useState(false);
   const [chatAttachments, setChatAttachments] = useState([]);
   const [generatedFiles, setGeneratedFiles] = useState([]);
+  const [inbox, setInbox] = useState([]);
+  const [internalComms, setInternalComms] = useState([]);
   const chatEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -422,6 +424,31 @@ export default function AIAdvisoryBoard() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Nacti inbox pri startu
+  const loadInbox = async () => {
+    try {
+      const res = await fetch("/api/inbox");
+      const data = await res.json();
+      if (data.items) setInbox(data.items);
+    } catch (e) { console.error("Inbox load error:", e); }
+  };
+
+  useEffect(() => { loadInbox(); }, []);
+
+  const resolveInboxItem = async (itemId, resolution) => {
+    try {
+      await fetch("/api/inbox", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: itemId, resolution, status: "resolved" })
+      });
+      loadInbox();
+    } catch (e) { console.error("Resolve error:", e); }
+  };
+
+  const ROLE_MAP = { financak: "FR", asistentka: "AS", inovator: "BA", zadavatel: "PR", stavbar: "ST" };
+  const DEPT_TO_ROLE = { finance: "financak", administration: "asistentka", ceo: "inovator", projects: "zadavatel", crm: "stavbar" };
 
   const FILE_CATEGORIES = [
     { id: "technicke-listy", name: "Technicke listy", desc: "TL vyrobcu, navody k aplikaci", icon: "TL", exts: [] },
@@ -997,6 +1024,40 @@ export default function AIAdvisoryBoard() {
           </div>
           <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: isMobile ? "flex-start" : "center", alignItems: "center", padding: isMobile ? "20px" : "0 48px 48px", position: "relative", zIndex: 1 }}>
             <div style={{ maxWidth: "750px", width: "100%" }}>
+            {/* INBOX - Pro tebe */}
+            {inbox.length > 0 && (
+              <div style={{ marginBottom: "32px" }}>
+                <div style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "4px", color: "rgba(255,255,255,0.25)", marginBottom: "16px" }}>Pro tebe ({inbox.length})</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {inbox.slice(0, 3).map(item => {
+                    const roleId = DEPT_TO_ROLE[item.fromDepartment] || item.fromDepartment;
+                    const role = ROLES.find(r => r.id === roleId);
+                    return (
+                      <div key={item.id} style={{ background: "rgba(255,255,255,0.04)", border: item.priority === "high" ? "2px solid #dc2626" : "1px solid rgba(255,255,255,0.08)", borderRadius: "14px", padding: "20px" }}>
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
+                          <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: 600, color: "rgba(255,255,255,0.5)" }}>{role?.initials || "?"}</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", marginBottom: "4px" }}>{role?.title || item.fromDepartment}</div>
+                            <div style={{ fontSize: "14px", fontWeight: 600, color: "#fff", marginBottom: "6px" }}>{item.title}</div>
+                            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", marginBottom: "14px" }}>{item.description}</div>
+                            <div style={{ display: "flex", gap: "8px" }}>
+                              {item.type === "approval" && (<>
+                                <div onClick={() => resolveInboxItem(item.id, { approved: true })} style={{ padding: "10px 20px", background: "#fff", color: "#0d0d0f", borderRadius: "10px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}>Schvalit</div>
+                                <div onClick={() => resolveInboxItem(item.id, { approved: false })} style={{ padding: "10px 20px", background: "transparent", color: "#fff", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "10px", fontSize: "12px", fontWeight: 500, cursor: "pointer" }}>Odmitnout</div>
+                              </>)}
+                              {(item.type === "info" || item.type === "alert" || item.type === "decision") && (
+                                <div onClick={() => resolveInboxItem(item.id, { acknowledged: true })} style={{ padding: "10px 20px", background: "#fff", color: "#0d0d0f", borderRadius: "10px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}>Rozumim</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "4px", color: "rgba(255,255,255,0.25)", marginBottom: "8px" }}>Vyber poradce</div>
             <div style={{ fontSize: isMobile ? "28px" : "42px", fontWeight: 600, color: "#fff", lineHeight: 1.1, marginBottom: "8px" }}>S kym chces<br/>mluvit?</div>
             <div style={{ fontSize: isMobile ? "13px" : "14px", fontWeight: 300, color: "rgba(255,255,255,0.4)", marginBottom: isMobile ? "24px" : "40px", maxWidth: "400px", lineHeight: 1.7 }}>Kazdy clen tymu ma svou specializaci. Vyber roli a zacni konverzaci.</div>
