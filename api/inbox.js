@@ -1,16 +1,10 @@
-// Inbox API - s fallback kdyz neni Firebase
+// Inbox API - bez potreby indexu
 export default async function handler(req, res) {
-  // Zkus Firebase, ale pokud neni nakonfigurovano, vrat prazdny seznam
   const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
   
   if (!serviceAccount || serviceAccount === "{}" || serviceAccount.length < 50) {
-    // Firebase neni nakonfigurovano - vrat prazdny inbox
-    if (req.method === "GET") {
-      return res.status(200).json({ items: [] });
-    }
-    if (req.method === "PUT" || req.method === "POST") {
-      return res.status(200).json({ success: true, note: "Firebase not configured" });
-    }
+    if (req.method === "GET") return res.status(200).json({ items: [] });
+    if (req.method === "PUT" || req.method === "POST") return res.status(200).json({ success: true });
     return res.status(405).json({ error: "Method not allowed" });
   }
 
@@ -19,22 +13,21 @@ export default async function handler(req, res) {
     const { getFirestore } = await import("firebase-admin/firestore");
     
     if (getApps().length === 0) {
-      const creds = JSON.parse(serviceAccount);
-      initializeApp({ credential: cert(creds) });
+      initializeApp({ credential: cert(JSON.parse(serviceAccount)) });
     }
     const db = getFirestore();
     
     if (req.method === "GET") {
+      // Jednodussi query bez orderBy - nevyzaduje index
       const snapshot = await db.collection("user_inbox")
         .where("status", "==", "pending")
-        .orderBy("createdAt", "desc")
         .limit(50)
         .get();
       
       const items = [];
-      snapshot.forEach(doc => {
-        items.push({ id: doc.id, ...doc.data() });
-      });
+      snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+      // Seradit na klientu
+      items.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
       
       return res.status(200).json({ items });
     }
@@ -48,13 +41,11 @@ export default async function handler(req, res) {
         resolution: resolution || null,
         resolvedAt: new Date().toISOString()
       });
-      
       return res.status(200).json({ success: true });
     }
     
     if (req.method === "POST") {
       const { type, fromDepartment, title, description, priority } = req.body;
-      
       const docRef = await db.collection("user_inbox").add({
         type: type || "info",
         fromDepartment: fromDepartment || "system",
@@ -64,17 +55,13 @@ export default async function handler(req, res) {
         status: "pending",
         createdAt: new Date().toISOString()
       });
-      
       return res.status(200).json({ id: docRef.id });
     }
     
     return res.status(405).json({ error: "Method not allowed" });
   } catch (error) {
     console.error("Inbox error:", error);
-    // Pri chybe vrat prazdny inbox misto 500
-    if (req.method === "GET") {
-      return res.status(200).json({ items: [], error: error.message });
-    }
+    if (req.method === "GET") return res.status(200).json({ items: [] });
     return res.status(500).json({ error: error.message });
   }
 }
