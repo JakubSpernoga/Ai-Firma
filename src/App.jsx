@@ -356,15 +356,16 @@ async function callClaude(messages, systemPrompt, roleId, mediaAttachments = [])
     });
     const data = await res.json();
     if (data.error) {
-      return "Chyba: " + (data.error.message || data.error);
+      return { text: "Chyba: " + (data.error.message || data.error), internalComms: [], actionResults: [] };
     }
     const parts = [];
     for (const block of (data.content || [])) {
       if (block.type === "text" && block.text) parts.push(block.text);
     }
-    return parts.filter(Boolean).join("\n\n") || "Chyba pri zpracovani odpovedi.";
+    const text = parts.filter(Boolean).join("\n\n") || "Chyba pri zpracovani odpovedi.";
+    return { text, internalComms: data.internalComms || [], actionResults: data.actionResults || [] };
   } catch (err) {
-    return "Chyba spojeni s API: " + err.message;
+    return { text: "Chyba spojeni s API: " + err.message, internalComms: [], actionResults: [] };
   }
 }
 
@@ -617,8 +618,8 @@ export default function AIAdvisoryBoard() {
       const contextSummary = messages.slice(-4).map(m => m.text).join("\n\n");
       const delegationMsg = [{ role: "user", text: `[Ukol od ${currentRoleName}]\n\nKontext z predchozi konverzace:\n${contextSummary}\n\nNovy ukol: ${userText}` }];
       
-      const colleagueResponse = await callClaude(delegationMsg, colleaguePrompt, directDelegation);
-      const aiText = `**Predano ${roleNames[directDelegation]}:**\n\n${colleagueResponse}`;
+      const colleagueResult = await callClaude(delegationMsg, colleaguePrompt, directDelegation);
+      const aiText = `**Predano ${roleNames[directDelegation]}:**\n\n${colleagueResult.text}`;
       
       // Uloz vlakno kolegovi
       const colleagueDebateId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
@@ -652,7 +653,14 @@ export default function AIAdvisoryBoard() {
     
     const basePrompt = activeRole === "porada" ? buildPoradaPrompt() : (SYSTEM_PROMPTS[activeRole] || "");
     const systemPrompt = basePrompt + buildFilesContext();
-    let aiText = await callClaude(newMsgs, systemPrompt, activeRole, mediaAttachments);
+    const aiResult = await callClaude(newMsgs, systemPrompt, activeRole, mediaAttachments);
+    let aiText = aiResult.text;
+    if (aiResult.internalComms && aiResult.internalComms.length > 0) {
+      setInternalComms(prev => [...prev, ...aiResult.internalComms]);
+    }
+    if (aiResult.actionResults && aiResult.actionResults.length > 0) {
+      loadInbox(); // Refresh inbox pokud jsou nove akce
+    }
     
     // Preved prirozene fraze na delegacni tagy
     const naturalDelegations = [
@@ -691,8 +699,8 @@ export default function AIAdvisoryBoard() {
       for (const del of delegations) {
         const colleaguePrompt = (SYSTEM_PROMPTS[del.role] || "") + buildFilesContext();
         const colleagueMsg = [{ role: "user", text: `[Ukol od ${currentRoleName}] ${del.task}` }];
-        const colleagueResponse = await callClaude(colleagueMsg, colleaguePrompt, del.role);
-        aiText += `\n\n---\n**${roleNames[del.role]} odpovida:**\n${colleagueResponse}`;
+        const colleagueResult = await callClaude(colleagueMsg, colleaguePrompt, del.role);
+        aiText += `\n\n---\n**${roleNames[del.role]} odpovida:**\n${colleagueResult.text}`;
         
         // Uloz vlakno kolegovi
         const colleagueDebateId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
@@ -754,8 +762,8 @@ export default function AIAdvisoryBoard() {
     setMessages(newMsgs); setLoading(true);
     const colleaguePrompt = (SYSTEM_PROMPTS[colleagueRoleId] || "") + buildFilesContext();
     const contextMsg = [{ role: "user", text: `${tag} ${question}` }];
-    const aiText = await callClaude(contextMsg, colleaguePrompt, colleagueRoleId);
-    const aiMsg = { role: "ai", text: `**${colleagueObj?.initials} (${colleagueObj?.title}):**\n${aiText}`, fromColleague: colleagueRoleId };
+    const aiResult = await callClaude(contextMsg, colleaguePrompt, colleagueRoleId);
+    const aiMsg = { role: "ai", text: `**${colleagueObj?.initials} (${colleagueObj?.title}):**\n${aiResult.text}`, fromColleague: colleagueRoleId };
     const finalMsgs = [...newMsgs, aiMsg]; setMessages(finalMsgs);
     let title = activeDebate?.title || "Nova debata";
     if (title === "Nova debata" && finalMsgs.length >= 2) { title = finalMsgs[0].text.substring(0, 50) + (finalMsgs[0].text.length > 50 ? "..." : ""); }
@@ -1208,6 +1216,18 @@ export default function AIAdvisoryBoard() {
                   <div style={{ fontSize: "16px", fontWeight: 600, color: "#1a1a1a", marginBottom: "4px" }}>{role?.title}</div>
                   <div style={{ fontSize: "12px", color: "rgba(0,0,0,0.3)", maxWidth: "300px" }}>{role?.desc}</div>
                 </div>
+              </div>
+            )}
+            {/* Interni komunikace */}
+            {internalComms.length > 0 && (
+              <div style={{ background: "rgba(37, 99, 235, 0.08)", border: "1px solid rgba(37, 99, 235, 0.2)", borderRadius: "12px", padding: "16px", marginBottom: "8px" }}>
+                <div style={{ fontSize: "10px", fontWeight: 600, color: "#2563eb", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "1px" }}>Interni komunikace</div>
+                {internalComms.slice(-3).map((c, i) => (
+                  <div key={i} style={{ fontSize: "12px", color: "#1e40af", marginBottom: "8px", padding: "8px 12px", background: "rgba(255,255,255,0.6)", borderRadius: "8px" }}>
+                    <div style={{ fontWeight: 600, marginBottom: "4px" }}>{ROLE_MAP[c.from] || c.from} se pta {c.to}: {c.question}</div>
+                    <div style={{ color: "#1a1a1a" }}>{c.response?.substring(0, 200)}{c.response?.length > 200 ? "..." : ""}</div>
+                  </div>
+                ))}
               </div>
             )}
             {messages.map((msg, i) => (
