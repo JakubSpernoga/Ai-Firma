@@ -629,7 +629,7 @@ export default function AIAdvisoryBoard() {
         createdAt: new Date().toISOString(),
         messages: [
           { role: "user", text: `[Ukol od ${currentRoleName}] ${userText}` },
-          { role: "ai", text: colleagueResponse }
+          { role: "ai", text: colleagueResult.text }
         ]
       };
       await saveDebate(colleagueDebate);
@@ -710,7 +710,7 @@ export default function AIAdvisoryBoard() {
           createdAt: new Date().toISOString(),
           messages: [
             { role: "user", text: `[Ukol od ${currentRoleName}] ${del.task}` },
-            { role: "ai", text: colleagueResponse }
+            { role: "ai", text: colleagueResult.text }
           ]
         };
         await saveDebate(colleagueDebate);

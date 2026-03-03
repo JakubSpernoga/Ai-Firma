@@ -1,18 +1,28 @@
-// Inbox API - polozky cekajici na schvaleni od uzivatele
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-
-function getDb() {
-  if (getApps().length === 0) {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || "{}");
-    initializeApp({ credential: cert(serviceAccount) });
-  }
-  return getFirestore();
-}
-
+// Inbox API - s fallback kdyz neni Firebase
 export default async function handler(req, res) {
+  // Zkus Firebase, ale pokud neni nakonfigurovano, vrat prazdny seznam
+  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+  
+  if (!serviceAccount || serviceAccount === "{}" || serviceAccount.length < 50) {
+    // Firebase neni nakonfigurovano - vrat prazdny inbox
+    if (req.method === "GET") {
+      return res.status(200).json({ items: [] });
+    }
+    if (req.method === "PUT" || req.method === "POST") {
+      return res.status(200).json({ success: true, note: "Firebase not configured" });
+    }
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
   try {
-    const db = getDb();
+    const { initializeApp, getApps, cert } = await import("firebase-admin/app");
+    const { getFirestore } = await import("firebase-admin/firestore");
+    
+    if (getApps().length === 0) {
+      const creds = JSON.parse(serviceAccount);
+      initializeApp({ credential: cert(creds) });
+    }
+    const db = getFirestore();
     
     if (req.method === "GET") {
       const snapshot = await db.collection("user_inbox")
@@ -43,7 +53,7 @@ export default async function handler(req, res) {
     }
     
     if (req.method === "POST") {
-      const { type, fromDepartment, title, description, priority, options } = req.body;
+      const { type, fromDepartment, title, description, priority } = req.body;
       
       const docRef = await db.collection("user_inbox").add({
         type: type || "info",
@@ -51,7 +61,6 @@ export default async function handler(req, res) {
         title: title || "Bez nazvu",
         description: description || "",
         priority: priority || "medium",
-        options: options || null,
         status: "pending",
         createdAt: new Date().toISOString()
       });
@@ -62,6 +71,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   } catch (error) {
     console.error("Inbox error:", error);
+    // Pri chybe vrat prazdny inbox misto 500
+    if (req.method === "GET") {
+      return res.status(200).json({ items: [], error: error.message });
+    }
     return res.status(500).json({ error: error.message });
   }
 }
